@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
 
-from .dsm import DsmClient, TaskInfo
+from .dsm import DsmApiError, DsmClient, TaskInfo
 from .errors import ToolError
 from .outputs import read_tail
 from .validation import TASK_PREFIX, check_tail_lines, check_task_name
@@ -52,6 +52,10 @@ class TaskService:
             raise ToolError("TASK_AMBIGUOUS", "more than one task has this name")
         return matches[0]
 
+    def _recently_started(self, name: str) -> bool:
+        started = self._started.get(name)
+        return started is not None and self._monotonic() - started < RECENT_START_GRACE_SECONDS
+
     async def list_tasks(self) -> dict:
         tasks = await self._dsm.list_tasks()
         return {"tasks": [_task_dict(t) for t in tasks if t.name.startswith(TASK_PREFIX)]}
@@ -62,12 +66,15 @@ class TaskService:
             task = await self._find(name)
             if not task.enabled:
                 raise ToolError("TASK_DISABLED", "task is disabled")
-            started = self._started.get(name)
-            recently = started is not None and self._monotonic() - started < RECENT_START_GRACE_SECONDS
-            if task.status == "running" or recently:
+            if task.status == "running" or self._recently_started(name):
                 raise ToolError("TASK_ALREADY_RUNNING", "task is already running")
-            await self._dsm.run_task(task)
+            # Record before calling: if DSM's reply is lost, the task may still have started.
             self._started[name] = self._monotonic()
+            try:
+                await self._dsm.run_task(task)
+            except DsmApiError:
+                del self._started[name]  # DSM definitely refused
+                raise
             return {"name": name, "started": True, "started_at": iso(self._clock())}
 
     async def task_result(self, name: object, tail_lines: object = None) -> dict:
@@ -75,7 +82,7 @@ class TaskService:
         lines = check_tail_lines(tail_lines)
         task = await self._find(name)
         tail, truncated = read_tail(self._output_dir, name, lines)
-        if task.status == "running":
+        if task.status == "running" or self._recently_started(name):
             status = "running"
         elif task.last_exit_code is None:
             status = "unknown"

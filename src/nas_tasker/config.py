@@ -62,36 +62,41 @@ def _positive_int(name: str, value: str) -> int:
     return number
 
 
+def _get(env: Mapping[str, str], key: str, default: str) -> str:
+    """An empty value (KEY= in .env) counts as unset."""
+    return env.get(key, "").strip() or default
+
+
 def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
     missing = [key for key in REQUIRED if not env.get(key, "").strip()]
     if missing:
         raise ConfigError("missing settings: " + ", ".join(missing))
-    if env.get("TASK_PREFIX", "bot-") != "bot-":
+    if _get(env, "TASK_PREFIX", "bot-") != "bot-":
         raise ConfigError("TASK_PREFIX must be 'bot-'")
     if len(env["MCP_BEARER_TOKEN"]) < 32:
         raise ConfigError("MCP_BEARER_TOKEN must be at least 32 characters")
 
     team = env["CF_ACCESS_TEAM_DOMAIN"].strip().removeprefix("https://").rstrip("/")
     return Settings(
-        dsm_url=env.get("DSM_URL", "http://127.0.0.1:5000").rstrip("/"),
+        dsm_url=_get(env, "DSM_URL", "http://127.0.0.1:5000").rstrip("/"),
         dsm_username=env["DSM_USERNAME"],
         dsm_password=env["DSM_PASSWORD"],
-        dsm_verify_tls=_bool("DSM_VERIFY_TLS", env.get("DSM_VERIFY_TLS", "true")),
+        dsm_verify_tls=_bool("DSM_VERIFY_TLS", _get(env, "DSM_VERIFY_TLS", "true")),
         task_output_dir=env["TASK_OUTPUT_DIR"],
-        share_allowlist=frozenset(_csv(env.get("SHARE_ALLOWLIST", ""))),
+        share_allowlist=frozenset(_csv(_get(env, "SHARE_ALLOWLIST", ""))),
         mcp_bearer_token=env["MCP_BEARER_TOKEN"],
         cf_access_issuer=f"https://{team}",
         cf_access_aud=env["CF_ACCESS_AUD"].strip(),
         allowed_emails=frozenset(e.lower() for e in _csv(env["ALLOWED_EMAILS"])),
-        bind_host=env.get("BIND_HOST", "127.0.0.1"),
-        bind_port=_positive_int("BIND_PORT", env.get("BIND_PORT", "8787")),
+        bind_host=_get(env, "BIND_HOST", "127.0.0.1"),
+        bind_port=_positive_int("BIND_PORT", _get(env, "BIND_PORT", "8787")),
         public_base_url=env["PUBLIC_BASE_URL"].rstrip("/"),
-        audit_log_path=env.get("AUDIT_LOG_PATH", "/data/audit/audit.jsonl"),
+        audit_log_path=_get(env, "AUDIT_LOG_PATH", "/data/audit/audit.jsonl"),
         confirm_token_ttl_seconds=_positive_int(
-            "CONFIRM_TOKEN_TTL_SECONDS", env.get("CONFIRM_TOKEN_TTL_SECONDS", "300")
+            "CONFIRM_TOKEN_TTL_SECONDS", _get(env, "CONFIRM_TOKEN_TTL_SECONDS", "300")
         ),
         mount_request_ttl_seconds=_positive_int(
-            "MOUNT_REQUEST_TTL_SECONDS", env.get("MOUNT_REQUEST_TTL_SECONDS", "600")
+            "MOUNT_REQUEST_TTL_SECONDS", _get(env, "MOUNT_REQUEST_TTL_SECONDS", "600")
         ),
-        log_level=env.get("LOG_LEVEL", "INFO").upper(),
+        log_level=_get(env, "LOG_LEVEL", "INFO").upper(),
     )

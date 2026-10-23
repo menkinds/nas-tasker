@@ -39,7 +39,7 @@ def test_missing_required_key():
         load_settings(env)
 
 
-@pytest.mark.parametrize("prefix", ["", "job-", "bot"])
+@pytest.mark.parametrize("prefix", ["job-", "bot", "Bot-"])
 def test_task_prefix_cannot_change(prefix):
     with pytest.raises(ConfigError, match="TASK_PREFIX"):
         load_settings(dict(BASE_ENV, TASK_PREFIX=prefix))
@@ -64,3 +64,13 @@ def test_tool_error_shape():
     assert err.to_dict() == {
         "error": {"code": "DSM_API_ERROR", "message": "DSM API call failed", "dsm_error_code": 117}
     }
+
+
+def test_empty_optional_keys_use_defaults():
+    # Compose passes "KEY=" lines from a copied .env.example as empty strings.
+    optional = ["DSM_URL", "DSM_VERIFY_TLS", "TASK_PREFIX", "SHARE_ALLOWLIST", "BIND_HOST",
+                "BIND_PORT", "AUDIT_LOG_PATH", "CONFIRM_TOKEN_TTL_SECONDS",
+                "MOUNT_REQUEST_TTL_SECONDS", "LOG_LEVEL"]
+    s = load_settings(dict(BASE_ENV, **{k: "" for k in optional}))
+    assert s == load_settings(BASE_ENV)
+    assert s.bind_host == "127.0.0.1" and s.log_level == "INFO"

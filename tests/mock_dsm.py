@@ -51,6 +51,8 @@ class MockDsm:
         self.down = False
         self.run_sets_running = True  # False simulates DSM status lag
         self.fail_containers = False
+        self.lose_run_reply = False  # DSM runs the task but the reply never arrives
+        self.refuse_run = False
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self.handle)
@@ -83,11 +85,15 @@ class MockDsm:
         return ok({"tasks": [dict(t) for t in self.tasks], "total": len(self.tasks)})
 
     def _SYNO_Core_TaskScheduler_run(self, form):
+        if self.refuse_run:
+            return fail(117)
         for item in json.loads(form["tasks"]):
             task = next(t for t in self.tasks if t["id"] == item["id"])
             self.runs.append(task["id"])
             if self.run_sets_running:
                 task["running"] = True
+        if self.lose_run_reply:
+            raise httpx.ReadTimeout("timed out")
         return ok()
 
     def _SYNO_Core_Share_get(self, form):

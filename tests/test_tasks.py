@@ -107,3 +107,28 @@ async def test_task_result(service, tmp_path, mock_dsm):
 
 async def test_task_result_bad_tail_lines(service):
     assert await code_of(service.task_result("bot-gbrain-rebuild", 5000)) == "INVALID_INPUT"
+
+
+async def test_task_result_right_after_run_is_running(service, tmp_path, mock_dsm):
+    mock_dsm.run_sets_running = False
+    (tmp_path / "bot-gbrain-rebuild").mkdir()
+    (tmp_path / "bot-gbrain-rebuild" / "latest.log").write_text("previous run ok\n")
+    await service.run_task("bot-gbrain-rebuild")
+    result = await service.task_result("bot-gbrain-rebuild")
+    assert (result["status"], result["finished_at"]) == ("running", None)
+
+
+async def test_lost_run_reply_does_not_allow_second_start(service, mock_dsm):
+    mock_dsm.lose_run_reply = True
+    assert await code_of(service.run_task("bot-gbrain-rebuild")) == "DSM_UNREACHABLE"
+    mock_dsm.lose_run_reply = False
+    mock_dsm.tasks[0]["running"] = False  # DSM still reports idle
+    assert await code_of(service.run_task("bot-gbrain-rebuild")) == "TASK_ALREADY_RUNNING"
+    assert mock_dsm.runs == [1]
+
+
+async def test_definite_dsm_refusal_does_not_block_retry(service, mock_dsm):
+    mock_dsm.refuse_run = True
+    assert await code_of(service.run_task("bot-gbrain-rebuild")) == "DSM_API_ERROR"
+    mock_dsm.refuse_run = False
+    assert (await service.run_task("bot-gbrain-rebuild"))["started"] is True
