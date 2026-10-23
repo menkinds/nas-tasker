@@ -93,7 +93,7 @@ def build_ui_router(shares: ShareService, audit: AuditLogger) -> APIRouter:
         ctx = current_call.get()
         audit.record(
             request_id=uuid.uuid4().hex,
-            actor_email=ctx.identity.subject,
+            actor_email=ctx.identity.email,
             auth_method=ctx.identity.auth_method,
             client_ip=ctx.client_ip,
             tool="ui_mount",

@@ -85,7 +85,7 @@ class Dispatcher:
             status, payload = 500, ToolError("INTERNAL", "internal error").to_dict()
         self._audit.record(
             request_id=uuid.uuid4().hex,
-            actor_email=ctx.identity.subject,
+            actor_email=ctx.identity.email,
             auth_method=ctx.identity.auth_method,
             client_ip=ctx.client_ip,
             tool=tool if tool in TOOL_ARGS else "unknown",

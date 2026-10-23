@@ -51,7 +51,7 @@ def audit_lines(tmp_path) -> list[dict]:
 def mcp_call(client, tool, arguments=None, headers=None):
     resp = client.post(
         "/mcp/",
-        headers={**MCP_HEADERS, **(headers or bot_headers())},
+        headers={**MCP_HEADERS, **(bot_headers() if headers is None else headers)},
         json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
               "params": {"name": tool, "arguments": arguments or {}}},
     )
