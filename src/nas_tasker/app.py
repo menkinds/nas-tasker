@@ -15,6 +15,7 @@ from .middleware import AuthMiddleware
 from .ratelimit import RateLimiter
 from .shares import ShareService
 from .tasks import TaskService
+from .ui import build_ui_router
 
 
 def build_app(
@@ -58,6 +59,7 @@ def build_app(
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(build_api_router(dispatcher))
+    app.include_router(build_ui_router(shares, audit))
     app.mount("/mcp", mcp_app)
 
     verifier = AccessVerifier(
