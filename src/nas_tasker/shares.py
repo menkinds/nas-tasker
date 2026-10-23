@@ -100,7 +100,9 @@ class ShareService:
         req.status = "in_progress"
         req.attempts += 1
         try:
-            await self._dsm.mount_share(req.share, password)
+            # A retry after a lost reply: DSM may have mounted it already.
+            if not (await self._dsm.get_share(req.share)).mounted:
+                await self._dsm.mount_share(req.share, password)
         except DsmApiError as err:
             if err.dsm_error_code in WRONG_PASSWORD_CODES:
                 req.status = "failed" if req.attempts >= MAX_PASSWORD_ATTEMPTS else "pending"

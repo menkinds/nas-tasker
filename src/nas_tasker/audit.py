@@ -42,6 +42,11 @@ class AuditLogger:
         self._max_bytes = max_bytes
         self._backups = backups
         self._lock = threading.Lock()
+        # Fail at startup, not after a task has already run with no record of it.
+        try:
+            open(path, "a", encoding="utf-8").close()
+        except OSError:
+            raise RuntimeError(f"audit log is not writable: {path}") from None
 
     def record(self, **fields) -> None:
         entry = {"ts": datetime.now().astimezone().isoformat(timespec="milliseconds"), **fields}

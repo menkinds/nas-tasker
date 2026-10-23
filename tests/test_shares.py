@@ -172,3 +172,15 @@ async def test_unmount_refuses_when_not_mounted_or_lookup_fails(shares, mock_dsm
     mock_dsm.fail_containers = True
     assert await code_of(shares.unmount_share("other", None, ME)) == "CONTAINER_LOOKUP_FAILED"
     assert await code_of(shares.unmount_share("homes", None, ME)) == "SHARE_NOT_ALLOWED"
+
+
+async def test_lost_mount_reply_then_retry_reports_mounted(shares, mock_dsm):
+    req_id = (await shares.mount_share("secret"))["request_id"]
+    csrf = shares.open_request(req_id).csrf
+    mock_dsm.lose_decrypt_reply = True
+    assert await code_of(shares.complete_mount(req_id, csrf, SHARE_PASSWORD)) == "DSM_UNREACHABLE"
+    mock_dsm.lose_decrypt_reply = False
+    assert mock_dsm.shares["secret"]["is_mounted"] is True  # DSM did mount it
+    assert await shares.complete_mount(req_id, csrf, SHARE_PASSWORD) == "mounted"
+    assert mock_dsm.calls.count(("SYNO.Core.Share.Crypto", "decrypt")) == 1
+    assert await shares.mount_share("secret", req_id) == {"status": "mounted"}
