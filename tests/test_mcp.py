@@ -24,11 +24,14 @@ def test_exactly_five_tools(client):
     assert names == ["list_tasks", "mount_share", "run_task", "task_result", "unmount_share"]
 
 
-def test_list_tasks_over_mcp_is_audited_with_identity(client, tmp_path):
-    data = result_of(mcp_call(client, "list_tasks", headers=bot_headers("reservoir.crabs@gmail.com")))
+def test_list_tasks_over_mcp_is_audited(client, tmp_path):
+    data = result_of(mcp_call(client, "list_tasks"))
     assert [t["name"] for t in data["tasks"]] == ["bot-gbrain-rebuild", "bot-disabled"]
-    [entry] = audit_lines(tmp_path)
-    assert (entry["tool"], entry["actor_email"]) == ("list_tasks", "reservoir.crabs@gmail.com")
+    entries = audit_lines(tmp_path)
+    assert [(e["tool"], e["auth_method"], e["actor_email"]) for e in entries] == [
+        ("list_tasks", "bearer", None),
+        ("mcp", "bearer", None),
+    ]
 
 
 def test_errors_come_back_as_json(client, mock_dsm):
@@ -46,7 +49,7 @@ def test_mount_share_over_mcp_returns_link(client):
     assert again["status"] == "pending_user_input"
 
 
-def test_mcp_without_auth(client, mock_dsm):
-    resp = mcp_call(client, "list_tasks", headers={"authorization": "Bearer " + "t" * 40})
+def test_mcp_without_bearer(client, mock_dsm):
+    resp = mcp_call(client, "list_tasks", headers={"cf-access-jwt-assertion": "x"})
     assert resp.status_code == 401
     assert mock_dsm.calls == []

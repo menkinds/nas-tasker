@@ -101,3 +101,19 @@ def test_rate_limiter_window():
     limiter.check("b", "run_task")  # other caller unaffected
     clock.now += 60
     limiter.check("a", "run_task")
+
+
+def test_auth_failure_limiter_blocks_then_releases():
+    from nas_tasker.ratelimit import AuthFailureLimiter
+
+    clock = Clock()
+    limiter = AuthFailureLimiter(max_failures=3, window=60.0, block=120.0, clock=clock)
+    for _ in range(3):
+        limiter.check("1.2.3.4")
+        limiter.failed("1.2.3.4")
+    with pytest.raises(ToolError) as exc:
+        limiter.check("1.2.3.4")
+    assert exc.value.code == "RATE_LIMITED"
+    limiter.check("5.6.7.8")  # other IPs unaffected
+    clock.now += 120
+    limiter.check("1.2.3.4")

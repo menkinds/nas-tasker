@@ -43,15 +43,14 @@ def test_run_task_and_error_shape(client, mock_dsm):
     ],
     ids=["nothing", "bearer-only", "jwt-only", "gbrain-token", "bad-jwt", "stranger"],
 )
-def test_bot_paths_need_jwt_and_bearer(client, tmp_path, mock_dsm, headers, status, code):
-    for path in ("/api/list_tasks", "/mcp/"):
-        resp = client.post(path, headers=headers, json={})
-        assert resp.status_code == status
-        assert resp.json()["error"]["code"] == code
+def test_api_paths_need_jwt_and_bearer(client, tmp_path, mock_dsm, headers, status, code):
+    # /mcp is bearer-only (see test_mcp_access.py); /api/ keeps Access + bearer.
+    resp = client.post("/api/list_tasks", headers=headers, json={})
+    assert resp.status_code == status
+    assert resp.json()["error"]["code"] == code
     assert mock_dsm.calls == []
-    entries = audit_lines(tmp_path)
-    assert len(entries) == 2 and all(e["tool"] == "auth" for e in entries)
-    assert all(e["result"] == "denied" for e in entries)
+    [entry] = audit_lines(tmp_path)
+    assert (entry["tool"], entry["result"]) == ("auth", "denied")
 
 
 def test_unknown_paths_are_404_without_auth(client):
