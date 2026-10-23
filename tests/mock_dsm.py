@@ -53,6 +53,7 @@ class MockDsm:
         self.fail_containers = False
         self.lose_run_reply = False  # DSM runs the task but the reply never arrives
         self.refuse_run = False
+        self.lose_decrypt_reply = False  # DSM mounts but the reply never arrives
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self.handle)
@@ -108,6 +109,8 @@ class MockDsm:
         if form["password"] != share["password"]:
             return fail(3302)
         share["is_mounted"] = True
+        if self.lose_decrypt_reply:
+            raise httpx.ReadTimeout("timed out")
         return ok()
 
     def _SYNO_Core_Share_Crypto_encrypt(self, form):

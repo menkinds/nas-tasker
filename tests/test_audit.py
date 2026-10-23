@@ -56,3 +56,24 @@ def test_rotation_keeps_backups(tmp_path):
     assert (tmp_path / "audit.jsonl.2").exists()
     assert not (tmp_path / "audit.jsonl.3").exists()
     assert read_lines(path)[-1]["n"] == 29
+
+
+def test_unwritable_audit_path_fails_at_startup(tmp_path):
+    import pytest
+
+    with pytest.raises(RuntimeError, match="audit log"):
+        AuditLogger(str(tmp_path / "missing-dir" / "audit.jsonl"))
+
+
+def test_app_refuses_to_start_without_writable_audit_log(tmp_path, mock_dsm):
+    import pytest
+
+    from nas_tasker.app import build_app
+    from nas_tasker.config import load_settings
+
+    from .test_config import BASE_ENV
+
+    settings = load_settings(dict(BASE_ENV, AUDIT_LOG_PATH=str(tmp_path / "nope" / "a.jsonl")))
+    with pytest.raises(RuntimeError, match="audit log"):
+        build_app(settings, dsm_transport=mock_dsm.transport())
+    assert mock_dsm.calls == []
