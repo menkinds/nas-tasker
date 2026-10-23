@@ -1,0 +1,41 @@
+services:
+  nas-tasker:
+    build:
+      context: ..
+      args:
+        APP_UID: ${APP_UID:-1026}
+        APP_GID: ${APP_GID:-100}
+    image: nas-tasker:local
+    container_name: nas-tasker
+    network_mode: host
+    env_file: .env
+    environment:
+      TASK_OUTPUT_DIR: /data/output
+      AUDIT_LOG_PATH: /data/audit/audit.jsonl
+    volumes:
+      - ${TASK_OUTPUT_HOST_DIR}:/data/output:ro
+      - ${AUDIT_HOST_DIR}:/data/audit
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:2024.12.2
+    container_name: nas-tasker-cloudflared
+    network_mode: host
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - nas-tasker
